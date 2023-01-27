@@ -14,12 +14,35 @@
          html, body {
          height: 100%; /* IMPORTANT!!! Stretches viewport to 100% */
          }
+         #slidecontainer {
+        width: 100%; /* Width of the outside container */
+        display: none;
+        }
+        label {
+            display: table-cell;
+            width: 1px;
+            white-space: nowrap;
+        }
+
+        span {
+            display: table-cell;
+            padding: 0 4px 0 6px;
+        }
+
+        input {
+            width: 95%;
+        }
       </style>
     <script src="html5-qrcode.min.js"></script>
 </head>
 <body>
 <!-- Div to show the scanner -->
 <div id="reader" ></div>
+<br/>
+<div id="slidecontainer">
+    <span><input type="range" value="1" class="slider" id="myRange"/></span>
+    <label id="zoom_value">1X zoom</label>
+</div>
 <script>
   //refer doc here https://github.com/mebjas/html5-qrcode
  const html5QrCode = new Html5Qrcode("reader");
@@ -39,23 +62,78 @@
      }
 
  };
- const config = {
+
+ var slidecontainer = document.getElementById("slidecontainer");
+ var slider = document.getElementById("myRange");
+ var zoomValue = document.getElementById("zoom_value");
+ var isZommAvailable = false;
+
+const config = {
      fps: 10,
      qrbox: {
          width: 280,
-         height: 120,
+         height: 280,
          aspectRatio: 1.7777778
-     }
+     },
+    //  showTorchButtonIfSupported: true,
+    // showZoomSliderIfSupported: true,
+    // defaultZoomValueIfSupported: 1
  };
 
- // If you want to prefer back camera
- html5QrCode.start({
-     facingMode: "environment"
- }, config, qrCodeSuccessCallback);
- //html5QrCode.start({ facingMode: "user" }, config, qrCodeSuccessCallback);
 
- //Window event listener
- if (window.chrome.webview != undefined) {
+ Html5Qrcode.getCameras().then(devices => {
+  /**
+   * devices would be an array of objects of type:
+   * { id: "id", label: "label" }
+   */
+  var deviceIdentifier;
+   // Check if devices are available
+   if (devices && devices.length) {
+        // Loop through the devices
+        for (device of devices) {
+          // Find the camera2 0 and back/achter
+          if (device.label.includes("camera2 0")) {
+            if (
+              device.label.includes("back") ||
+              device.label.includes("achter")
+            )
+              // Set the identifier, to be used in qrcode.start()
+              deviceIdentifier = device.id;
+          }
+        }
+
+        // Camera2 0 not found, set faceing mode to environment
+        if (!deviceIdentifier) {
+          //alert("Default config used");
+          deviceIdentifier = { facingMode: "environment" };
+        }
+    html5QrCode.start(deviceIdentifier, config, qrCodeSuccessCallback);
+
+    setTimeout(() => {
+      var capabilities = html5QrCode.getRunningTrackCapabilities();
+      if (!capabilities.zoom) {
+          slidecontainer.style.display = 'none';
+      }else{
+        isZommAvailable = true;
+        // Map zoom to a slider element.
+        slider.min = capabilities.zoom.min;
+        slider.max = capabilities.zoom.max;
+        slider.step = capabilities.zoom.step;
+        slidecontainer.style.display = 'table';
+      }
+    }, 2000);
+  }
+}).catch(error => {
+  console.log('Argh!', error);
+
+  console.log('Argh! message', error.name);
+  if(error.toString().includes('NotAllowedError')){
+    alert("Please grant camera permission");
+  }
+});
+
+//Window event listener
+if (window.chrome.webview != undefined) {
      window.chrome.webview.addEventListener('message', function(e) {
          let data = JSON.parse(JSON.stringify(e.data));
          if (data.event === "close") {
@@ -64,6 +142,16 @@
 
      });
  }
+
+// Update the current slider value (each time you drag the slider handle)
+slider.oninput = function() {
+  zoomValue.innerHTML = this.value + "X zoom"
+  html5QrCode.applyVideoConstraints({
+          focusMode: "continuous",
+          advanced: [{ zoom: this.value}],
+    });
+}
+
  </script>
 </body>
 </html>
