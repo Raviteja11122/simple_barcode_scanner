@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
                 var res = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const SimpleBarcodeScannerPage(),
+                      builder: (context) => const SimpleBarcodeScannerPage(), fullscreenDialog: true
                     ));
                 setState(() {
                   if (res is String) {
